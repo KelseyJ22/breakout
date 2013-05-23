@@ -1,0 +1,287 @@
+
+/*
+ * File: Breakout.java
+ * -------------------
+ * Name: Kelsey Josund
+ * Section Leader: Jimmy Lee
+ * 
+ * This file will eventually implement the game of Breakout.
+ */
+ 
+import acm.graphics.*;
+import acm.program.*;
+import acm.util.*;
+ 
+import java.applet.*;
+import java.awt.*;
+import java.awt.event.*;
+ 
+public class BreakoutExtended extends GraphicsProgram {
+ 
+    /** Width and height of application window in pixels */
+    public static final int APPLICATION_WIDTH = 400;
+    public static final int APPLICATION_HEIGHT = 600;
+ 
+    /** Dimensions of game board (usually the same) */
+    private static final int WIDTH = APPLICATION_WIDTH;
+    private static final int HEIGHT = APPLICATION_HEIGHT;
+ 
+    /** Dimensions of the paddle */
+    private static final int PADDLE_WIDTH = 60;
+    private static final int PADDLE_HEIGHT = 10;
+ 
+    /** Offset of the paddle up from the bottom */
+    private static final int PADDLE_Y_OFFSET = 30;
+ 
+    /** Number of bricks per row */
+    private static final int NBRICKS_PER_ROW = 10;
+ 
+    /** Number of rows of bricks */
+    private static final int NBRICK_ROWS = 10;
+ 
+    /** Separation between bricks */
+    private static final int BRICK_SEP = 4;
+ 
+    /** Width of a brick */
+    private static final int BRICK_WIDTH =
+        (WIDTH - (NBRICKS_PER_ROW - 1) * BRICK_SEP) / NBRICKS_PER_ROW;
+ 
+    /** Height of a brick */
+    private static final int BRICK_HEIGHT = 8;
+ 
+    /** Radius of the ball in pixels */
+    private static final int BALL_RADIUS = 10;
+ 
+    /** Offset of the top brick row from the top */
+    private static final int BRICK_Y_OFFSET = 70;
+ 
+    /** Number of turns */
+    private static final int NTURNS = 3;
+ 
+    /** Pause time for animation */
+    private static final int PAUSE_TIME = 15;
+ 
+    RandomGenerator rgen = RandomGenerator.getInstance();
+    private double vx, vy;
+    private GRect paddle;
+    private GRect brick;
+    private int brickCounter = NBRICKS_PER_ROW * NBRICK_ROWS;
+    private int ballCounter = 0;
+    private int lives = 3;
+ 
+    AudioClip bounceClip = MediaTools.loadAudioClip("bounce.au");
+ 
+    /** Runs the Breakout program by creating the gameplay screen and then allowing for play */
+    public void run() {
+        createGame();
+        playGame();
+    }
+ 
+    //sets up the gameplay screen with bricks, paddle, and mouse listeners
+    private void createGame(){
+        createBricks();
+        createPaddle();
+        add(paddle);
+        addMouseListeners();
+    }
+ 
+    //allows for game play by adding the ball and keeping track of the turns the player has used
+    private void playGame(){
+        for (int turns = 0; turns < NTURNS; turns++) {
+            GImage ball = createBall();
+            add(ball);
+            startMessage();
+            makeBallBounce(ball);
+            getCollidingObject(ball);
+            Color PURPLE = new Color(145, 44, 238);
+            //presents the winning message
+            if (brickCounter == 0) {
+                GLabel end = new GLabel ("You win!", WIDTH/2,
+                                        HEIGHT/2);
+                end.setFont("Helvetica-35");
+                end.setColor(PURPLE);
+                add(end);
+                break;
+            }
+            //presents the losing message
+            if (turns == NTURNS - 1) {
+                if (brickCounter > 0) {
+                    GLabel lose = new GLabel ("Game Over!", WIDTH/2,
+                                            HEIGHT/2);
+                    lose.setFont("Helvetica-35");
+                    lose.setColor(PURPLE);
+                    add(lose);
+                    break;
+                }
+            }
+        }
+    }
+ 
+    //Creates a single brick to be used in the createBricks method
+    private void drawBrick(double x, double y, Color  c) {
+        brick = new GRect (x, y, BRICK_WIDTH, BRICK_HEIGHT);
+        brick.setFilled(true);
+        brick.setColor(c);
+        add(brick);
+    }
+ 
+    //Creates the arrangement of bricks across the top of the screen
+    private void createBricks(){
+        for (int rows = 0; rows < NBRICKS_PER_ROW; rows++){
+            for (int columns = 0; columns < NBRICK_ROWS; columns++) {
+                drawBrick(columns * (BRICK_WIDTH + BRICK_SEP),
+                        BRICK_Y_OFFSET + (rows * (BRICK_HEIGHT + BRICK_SEP)), Color.red);
+                //determines the color of the bricks based on which row they're in
+                brick.setColor(rgen.nextColor());
+            }
+        }
+    }
+ 
+    /*Creates the paddle at the bottom of the screen as a new GRect
+     * object positioned based off of named constants.*/
+    private GRect createPaddle() {
+        paddle = new GRect (0, HEIGHT - PADDLE_Y_OFFSET,
+                PADDLE_WIDTH, PADDLE_HEIGHT);
+        paddle.setFilled(true);
+        paddle.setColor(Color.black);
+        return paddle;
+    }
+ 
+    /*Allows the paddle to move: follows movements of the mouse
+     * and constrains its x-values to be within the application window. */
+    public void mouseMoved(MouseEvent e) {
+        paddle.setLocation (e.getX() - PADDLE_WIDTH,
+                HEIGHT - PADDLE_Y_OFFSET);
+        if (paddle.getX() < 0){
+            paddle.setLocation(0, HEIGHT - PADDLE_Y_OFFSET);
+        } else if (paddle.getX() + PADDLE_WIDTH > WIDTH ){
+            paddle.setLocation(WIDTH - PADDLE_WIDTH,
+                    HEIGHT - PADDLE_Y_OFFSET);
+        }
+    }
+ 
+    /*Creates a message prompting the player to begin. The same waitForClick() is used
+     *to remove the message and start the game */
+    private void startMessage(){
+        GLabel start = new GLabel ("CLICK TO BEGIN", WIDTH/2,
+                HEIGHT);
+        start.setFont("Helvetica-20");
+        start.setColor(Color.black);
+        add(start);
+        start.setLocation((WIDTH - start.getWidth()) / 2,
+                HEIGHT - 2 * PADDLE_Y_OFFSET);
+        waitForClick();
+        remove(start);
+    }
+ 
+    //Creates the ball
+    private GImage createBall() {
+        GImage ball = new GImage ("ball.jpeg");
+        ball.setLocation(WIDTH/2, HEIGHT/2);
+        return ball;
+    }
+ 
+    //Makes the ball bounce based on random X and Y velocities.
+    private void makeBallBounce(GImage ball) {
+        vx = rgen.nextDouble(1.0, 3.0);
+        if (rgen.nextBoolean(.5)) vx = -vx;
+        vy = rgen.nextDouble(2.0, 6.0);
+        //keeps track of lives left
+        GLabel livesLeft = new GLabel ("Lives left: " + lives);
+        livesLeft.setFont("Helvetica-25");
+        livesLeft.setLocation(WIDTH - livesLeft.getWidth(),
+                HEIGHT - livesLeft.getDescent());
+        add(livesLeft);
+        while (true) {
+            ball.move(vx, vy);
+            // when the bottom of the ball hits the bottom, the turn ends
+            if (ballHitsGround(ball)) {
+                lives--;
+                remove(livesLeft);
+                break;}
+            //y velocity reverses when the top of the ball hits the top.
+            if (ballHitsTop(ball)) {
+                bounceClip.play();
+                vy *= -1;
+            }
+            //x velocity reverses when the right side of the ball hits the right wall.
+            if (ballHitsRightWall(ball)) {
+                bounceClip.play();
+                vx *= -1;
+            }
+            //x velocity reverses when the left side of the ball hits the left wall.
+            if (ballHitsLeftWall(ball)) {
+                bounceClip.play();
+                vx *= -1;
+            }
+            //collisions with things besides the wall
+            GObject collider = getCollidingObject(ball);
+            if (collider == paddle) {
+                bounceClip.play();
+                ballCounter++;
+                if (ballCounter <= 15){
+                    if (vy >= 0) {
+                        vy *= -1;
+                    }
+                }
+                //causes the ball to gradually speed up after 15 bounces off the paddle
+                else vy *= -1.1;
+            }       
+            else if (collider != ball && collider != livesLeft) {
+                //turns bricks purple 50% of the time randomly and doesn't delete them until hit again
+                Color PURPLE = new Color(145, 44, 238);
+                if (rgen.nextBoolean(.5)) {
+                    collider.setColor(PURPLE);
+                }
+                else
+                    remove(collider);
+                vy *= -1;
+                brickCounter--;
+            }
+            //animates the ball's movement to a visible speed
+            pause(PAUSE_TIME);
+        }
+        remove(ball);
+    }
+     
+    //returns the  objects which collide with the ball at the four corner points of its corresponding rectangle
+    private GObject getCollidingObject(GImage ball) {
+        if (getElementAt(ball.getX(), ball.getY()) != null){
+            return getElementAt(ball.getX(), ball.getY());
+        }
+        else if (getElementAt(ball.getX(), ball.getY() + 2 * BALL_RADIUS) != null) { 
+            return getElementAt(ball.getX(), ball.getY() + 2 * BALL_RADIUS);
+        }
+        else if (getElementAt(ball.getX() + 2 * BALL_RADIUS, ball.getY() + 2 * BALL_RADIUS) != null) {
+            return getElementAt(ball.getX() + 2 * BALL_RADIUS, ball.getY() + 2 * BALL_RADIUS);
+        }
+        else if (getElementAt(ball.getX() + 2 * BALL_RADIUS, ball.getY()) != null) {
+            return getElementAt(ball.getX() + 2 * BALL_RADIUS, ball.getY());
+        }
+        else {
+            return null;
+        }
+    }
+ 
+    //the ball bounces off the bottom of the application window
+    private boolean ballHitsGround(GImage ball) {
+        double bottomOfBall = ball.getY() + ball.getHeight();
+        return bottomOfBall >= HEIGHT;
+    }
+    //the ball bounces off the top of the application window
+    private boolean ballHitsTop(GImage ball) {
+        double topOfBall = ball.getY();
+        return topOfBall <= 0;
+    }
+    //the ball bounces off the right wall of the application window
+    private boolean ballHitsRightWall(GImage ball) {
+        double rightSideOfBall = ball.getX() + ball.getWidth();
+        return rightSideOfBall >= WIDTH;
+    }
+    //the ball bounces off the left wall of the application window
+    private boolean ballHitsLeftWall(GImage ball) {
+        double leftSideOfBall = ball.getX();
+        return leftSideOfBall <= 0;
+    }
+}
+    
